@@ -15,7 +15,7 @@ use hal::*;
 
 use gpio::{Floating, Input, PfC, PfD, Port};
 use hal::clock::GenericClockController;
-use hal::sercom::{I2CMaster4, PadPin, SPIMaster1, UART5};
+use hal::sercom::{I2CMaster4, PadPin, SPIMaster1, SPIMaster4, UART5};
 use hal::time::Hertz;
 
 pub use hal::common::*;
@@ -100,13 +100,13 @@ define_pins!(
     /// Analog 7
     pin a7 = b3,
 
-    /// SPI (Lefacy ICSP) 1 / NINA MOSI
+    /// SPI (Legacy ICSP) 1 / NINA MOSI
     pin nina_mosi = a12,
-    /// SPI (Lefacy ICSP) 2 / NINA MISO
+    /// SPI (Legacy ICSP) 2 / NINA MISO
     pin nina_miso = a13,
-    /// SPI (Lefacy ICSP) 3 / NINA CS
+    /// SPI (Legacy ICSP) 3 / NINA CS
     pin nina_cs = a14,
-    /// SPI (Lefacy ICSP) 4 / NINA SCK
+    /// SPI (Legacy ICSP) 4 / NINA SCK
     pin nina_sck = a15,
     pin nina_gpio0 = a27,
     pin nina_resetn = a8,
@@ -201,7 +201,7 @@ pub fn uart<F: Into<Hertz>>(
 }
 
 /// Convenience for setting up the labelled SPI peripheral.
-/// This powers up SERCOM4 and configures it for use as an
+/// This powers up SERCOM1 and configures it for use as an
 /// SPI Master in SPI Mode 0.
 pub fn spi_master<F: Into<Hertz>>(
     clocks: &mut GenericClockController,
@@ -227,6 +227,39 @@ pub fn spi_master<F: Into<Hertz>>(
             polarity: hal::hal::spi::Polarity::IdleLow,
         },
         sercom1,
+        pm,
+        (miso.into_pad(port), mosi.into_pad(port), sck.into_pad(port)),
+    )
+}
+
+/// Convenience for setting up the labelled SPI peripheral.
+/// This powers up SERCOM4 and configures it for use as an
+/// SPI Master in SPI Mode 0.
+/// This SPI is connected to the NINA-W102
+pub fn spi_master_wifi<F: Into<Hertz>>(
+    clocks: &mut GenericClockController,
+    bus_speed: F,
+    sercom4: pac::SERCOM4,
+    pm: &mut pac::PM,
+    sck: hal::gpio::Pa15<Input<Floating>>,
+    mosi: hal::gpio::Pa12<Input<Floating>>,
+    miso: hal::gpio::Pa13<Input<Floating>>,
+    port: &mut Port,
+) -> SPIMaster4<
+    hal::sercom::Sercom4Pad1<hal::gpio::Pa13<PfD>>, //miso
+    hal::sercom::Sercom4Pad0<hal::gpio::Pa12<PfD>>, //mosi
+    hal::sercom::Sercom4Pad3<hal::gpio::Pa15<PfD>>, //sck
+> {
+    let gclk0 = clocks.gclk0();
+
+    SPIMaster4::new(
+        &clocks.sercom4_core(&gclk0).unwrap(),
+        bus_speed.into(),
+        hal::hal::spi::Mode {
+            phase: hal::hal::spi::Phase::CaptureOnFirstTransition,
+            polarity: hal::hal::spi::Polarity::IdleLow,
+        },
+        sercom4,
         pm,
         (miso.into_pad(port), mosi.into_pad(port), sck.into_pad(port)),
     )
